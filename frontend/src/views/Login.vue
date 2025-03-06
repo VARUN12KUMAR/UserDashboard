@@ -138,12 +138,15 @@ export default {
 
     const handleSubmit = async () => {
       try {
-        await store.dispatch('auth/login', {
+        const success = await store.dispatch('auth/login', {
           username: username.value,
           email: email.value,
           password: password.value
         });
-        router.push('/users');
+
+        if (success) {
+          await router.push({ name: 'Dashboard' });
+        }
       } catch (error) {
         console.error('Login failed:', error);
       }

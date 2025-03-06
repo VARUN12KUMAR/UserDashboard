@@ -3,14 +3,16 @@ import App from './App.vue';
 import router from './router';
 import store from './store';
 import axios from 'axios';
+import './assets/main.css';
 
-// Set default axios configuration
+// Configure axios defaults
 axios.defaults.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+axios.defaults.withCredentials = true;
 
-// Set up axios interceptors for authentication
+// Add request interceptor
 axios.interceptors.request.use(
   (config) => {
-    const token = store.state.auth?.token;
+    const token = store.getters['auth/token'];
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -21,19 +23,24 @@ axios.interceptors.request.use(
   }
 );
 
-// Handle 401 responses
+// Add response interceptor
 axios.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401) {
-      store.dispatch('auth/logout');
+      await store.dispatch('auth/logout');
       router.push('/login');
     }
     return Promise.reject(error);
   }
 );
 
+// Initialize the app
 const app = createApp(App);
-app.use(store);
+
+// Use plugins
 app.use(router);
+app.use(store);
+
+// Mount the app
 app.mount('#app'); 

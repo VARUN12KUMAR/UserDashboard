@@ -59,10 +59,13 @@ const router = createRouter({
   routes
 });
 
+// Navigation guard
 router.beforeEach((to, from, next) => {
   const isAuthenticated = store.getters['auth/isAuthenticated'];
+  const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
 
-  if (to.meta.requiresAuth && !isAuthenticated) {
+  // Handle authentication
+  if (requiresAuth && !isAuthenticated) {
     next('/login');
   } else if ((to.path === '/login' || to.path === '/register') && isAuthenticated) {
     next('/dashboard');

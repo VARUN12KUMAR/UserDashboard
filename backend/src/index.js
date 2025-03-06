@@ -6,6 +6,8 @@ const cors = require('cors');
 const sequelize = require('./config/database');
 const UserService = require('./services/UserService');
 const authMiddleware = require('./middleware/auth');
+const errorHandler = require('./middleware/errorHandler');
+const { AppError } = require('./utils/errors');
 
 const app = express();
 const server = http.createServer(app);
@@ -69,6 +71,18 @@ io.on('connection', (socket) => {
   });
 });
 
+// Mount routes
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/users', authMiddleware, require('./routes/users'));
+
+// Handle undefined routes
+app.all('*', (req, res, next) => {
+  next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
+});
+
+// Global error handler
+app.use(errorHandler);
+
 // Cleanup function
 function cleanup() {
   UserService.stopPeriodicFetch(userFetchInterval);
@@ -81,21 +95,6 @@ function cleanup() {
     process.exit(0);
   }
 }
-
-// Mount routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/users', authMiddleware, require('./routes/users'));
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('✗ Error:', err.message);
-  res.status(500).json({ 
-    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong!',
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-  });
-});
-
-const PORT = process.env.PORT || 3000;
 
 // Start the server
 async function startServer() {
@@ -117,4 +116,5 @@ async function startServer() {
 process.on('SIGTERM', cleanup);
 process.on('SIGINT', cleanup);
 
+const PORT = process.env.PORT || 3000;
 startServer(); 

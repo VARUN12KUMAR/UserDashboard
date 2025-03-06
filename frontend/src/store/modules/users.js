@@ -79,7 +79,10 @@ const actions = {
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      timeout: 20000
+      timeout: 20000,
+      auth: {
+        token: localStorage.getItem('auth_token')
+      }
     });
 
     socket.on('connect', () => {
@@ -99,7 +102,6 @@ const actions = {
       commit('setConnectionStatus', false);
       
       if (reason === 'io server disconnect') {
-        // Server disconnected us, try to reconnect
         socket.connect();
       }
     });
@@ -108,7 +110,6 @@ const actions = {
       console.log(`✓ Reconnected to server after ${attemptNumber} attempts`);
       commit('setConnectionStatus', true);
       commit('setConnectionError', null);
-      // Refresh data after reconnection
       dispatch('fetchUsers');
     });
 
@@ -122,14 +123,18 @@ const actions = {
       commit('setConnectionError', 'Failed to reconnect. Retrying...');
     });
 
-    socket.on('initialUsers', (users) => {
+    socket.on('initialUsers', (data) => {
+      const users = Array.isArray(data.data?.users) ? data.data.users : data;
       commit('setUsers', users);
       commit('setTotalUsers', users.length);
       console.log('✓ Initial user data received');
     });
 
     socket.on('newUsers', ({ users, timestamp }) => {
-      commit('updateUsers', { users, timestamp });
+      commit('updateUsers', { 
+        users: Array.isArray(users.data?.users) ? users.data.users : users, 
+        timestamp 
+      });
       commit('setTotalUsers', state.list.length);
       console.log('✓ Real-time user update received');
     });
@@ -154,9 +159,10 @@ const actions = {
       }
 
       const response = await axios.get(`/api/users?${params.toString()}`);
-      commit('setUsers', response.data);
-      commit('setTotalUsers', response.data.length);
-      return response.data;
+      const users = response.data.data?.users || response.data;
+      commit('setUsers', users);
+      commit('setTotalUsers', users.length);
+      return users;
     } catch (error) {
       console.error('Error fetching users:', error);
       commit('setError', error.response?.data?.message || 'Failed to fetch users');
@@ -171,8 +177,9 @@ const actions = {
       commit('setLoading', true);
       commit('setError', null);
       const response = await axios.get(`/api/users/${id}`);
-      commit('setCurrentUser', response.data);
-      return response.data;
+      const user = response.data.data?.user || response.data;
+      commit('setCurrentUser', user);
+      return user;
     } catch (error) {
       console.error('Error fetching user:', error);
       commit('setError', error.response?.data?.message || 'Failed to fetch user details');
