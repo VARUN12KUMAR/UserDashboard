@@ -10,10 +10,24 @@
               {{ totalFilteredUsers }} users found
             </p>
           </div>
-          <div class="mt-4 sm:mt-0">
+          <div class="mt-4 sm:mt-0 flex items-center space-x-4">
+            <!-- Connection Status -->
+            <div class="flex items-center">
+              <div 
+                :class="[
+                  'h-3 w-3 rounded-full mr-2',
+                  isConnected ? 'bg-green-500' : 'bg-red-500'
+                ]"
+              ></div>
+              <span class="text-sm text-gray-600">
+                {{ isConnected ? 'Connected' : 'Disconnected' }}
+              </span>
+            </div>
+            
             <button 
               @click="refreshUsers"
-              class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              :disabled="isLoading"
+              class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
             >
               <svg 
                 xmlns="http://www.w3.org/2000/svg" 
@@ -25,9 +39,39 @@
               >
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
-              Refresh
+              {{ isLoading ? 'Refreshing...' : 'Refresh' }}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Connection Error Message -->
+    <div v-if="connectionError" class="rounded-md bg-yellow-50 p-4">
+      <div class="flex">
+        <div class="flex-shrink-0">
+          <svg class="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+          </svg>
+        </div>
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-yellow-800">
+            {{ connectionError }}
+          </h3>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error Message -->
+    <div v-if="error" class="rounded-md bg-red-50 p-4">
+      <div class="flex">
+        <div class="flex-shrink-0">
+          <svg class="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+          </svg>
+        </div>
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-red-800">{{ error }}</h3>
         </div>
       </div>
     </div>
@@ -59,7 +103,7 @@
           <div>
             <label class="block text-sm font-medium text-gray-700">Gender</label>
             <select
-              v-model="filters.gender"
+              v-model="selectedGender"
               @change="applyFilters"
               class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
             >
@@ -73,7 +117,7 @@
           <div>
             <label class="block text-sm font-medium text-gray-700">Age Range</label>
             <select
-              v-model="filters.ageRange"
+              v-model="selectedAgeRange"
               @change="applyFilters"
               class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
             >
@@ -84,20 +128,6 @@
               <option value="46+">46+</option>
             </select>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Error Message -->
-    <div v-if="error" class="rounded-md bg-red-50 p-4">
-      <div class="flex">
-        <div class="flex-shrink-0">
-          <svg class="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-          </svg>
-        </div>
-        <div class="ml-3">
-          <h3 class="text-sm font-medium text-red-800">{{ error }}</h3>
         </div>
       </div>
     </div>
@@ -207,16 +237,16 @@ export default {
     const store = useStore();
     const router = useRouter();
     const searchQuery = ref('');
-    const filters = ref({
-      gender: '',
-      ageRange: ''
-    });
+    const selectedGender = ref('');
+    const selectedAgeRange = ref('');
 
     const isLoading = computed(() => store.state.users.isLoading);
     const error = computed(() => store.state.users.error);
     const filteredUsers = computed(() => store.getters['users/filteredUsers']);
     const totalFilteredUsers = computed(() => store.getters['users/totalFilteredUsers']);
     const isConnected = computed(() => store.getters['users/isConnected']);
+    const connectionError = computed(() => store.getters['users/connectionError']);
+    const lastUpdate = computed(() => store.getters['users/getLastUpdate']);
 
     const handleSearch = debounce(async () => {
       try {
@@ -228,7 +258,10 @@ export default {
 
     const applyFilters = async () => {
       try {
-        await store.dispatch('users/applyFilters', filters.value);
+        await store.dispatch('users/applyFilters', {
+          gender: selectedGender.value || null,
+          ageRange: selectedAgeRange.value || null
+        });
       } catch (error) {
         console.error('Filter application failed:', error);
       }
@@ -238,7 +271,7 @@ export default {
       try {
         await store.dispatch('users/fetchUsers');
       } catch (error) {
-        console.error('Refresh failed:', error);
+        console.error('Failed to refresh users:', error);
       }
     };
 
@@ -262,12 +295,15 @@ export default {
 
     return {
       searchQuery,
-      filters,
+      selectedGender,
+      selectedAgeRange,
       isLoading,
       error,
       filteredUsers,
       totalFilteredUsers,
       isConnected,
+      connectionError,
+      lastUpdate,
       handleSearch,
       applyFilters,
       refreshUsers,
@@ -276,4 +312,22 @@ export default {
     };
   }
 };
-</script> 
+</script>
+
+<style scoped>
+.user-card {
+  @apply bg-white shadow rounded-lg overflow-hidden transition-transform duration-200 hover:transform hover:scale-[1.02];
+}
+
+.user-card-header {
+  @apply px-4 py-5 sm:px-6 flex items-center space-x-4;
+}
+
+.user-card-body {
+  @apply px-4 py-5 sm:p-6 border-t border-gray-200;
+}
+
+.user-card-footer {
+  @apply px-4 py-4 sm:px-6 bg-gray-50 flex justify-end;
+}
+</style> 

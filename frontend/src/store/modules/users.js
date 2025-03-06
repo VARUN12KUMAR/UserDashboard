@@ -8,6 +8,8 @@ const state = {
   isLoading: false,
   error: null,
   socket: null,
+  isConnected: false,
+  connectionError: null,
   totalUsers: 0,
   searchQuery: '',
   filters: {
@@ -22,7 +24,7 @@ const mutations = {
   },
   updateUsers(state, { users, timestamp }) {
     const uniqueUsers = users.filter(newUser => 
-      !state.list.some(existingUser => existingUser.apiId === newUser.apiId)
+      !state.list.some(existingUser => existingUser.email === newUser.email)
     );
     state.list = [...uniqueUsers, ...state.list];
     state.lastUpdate = timestamp;
@@ -39,11 +41,18 @@ const mutations = {
   setSocket(state, socket) {
     state.socket = socket;
   },
+  setConnectionStatus(state, status) {
+    state.isConnected = status;
+  },
+  setConnectionError(state, error) {
+    state.connectionError = error;
+  },
   clearSocket(state) {
     if (state.socket) {
       state.socket.disconnect();
       state.socket = null;
     }
+    state.isConnected = false;
   },
   setTotalUsers(state, total) {
     state.totalUsers = total;
@@ -59,32 +68,70 @@ const mutations = {
 const actions = {
   initializeSocket({ commit, dispatch }) {
     const wsUrl = import.meta.env.VITE_WS_URL || 'http://localhost:3000';
+    
+    // Cleanup any existing socket
+    commit('clearSocket');
+
     const socket = io(wsUrl, {
       transports: ['websocket'],
       autoConnect: true,
       reconnection: true,
+      reconnectionAttempts: 10,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5
+      timeout: 20000
     });
 
     socket.on('connect', () => {
       console.log('✓ Connected to server');
+      commit('setConnectionStatus', true);
+      commit('setConnectionError', null);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('✗ Socket connection error:', error.message);
+      commit('setConnectionStatus', false);
+      commit('setConnectionError', 'Connection to server failed. Retrying...');
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('✗ Disconnected from server:', reason);
+      commit('setConnectionStatus', false);
+      
+      if (reason === 'io server disconnect') {
+        // Server disconnected us, try to reconnect
+        socket.connect();
+      }
+    });
+
+    socket.on('reconnect', (attemptNumber) => {
+      console.log(`✓ Reconnected to server after ${attemptNumber} attempts`);
+      commit('setConnectionStatus', true);
+      commit('setConnectionError', null);
+      // Refresh data after reconnection
+      dispatch('fetchUsers');
+    });
+
+    socket.on('reconnect_attempt', (attemptNumber) => {
+      console.log(`Attempting to reconnect... (attempt ${attemptNumber})`);
+      commit('setConnectionError', `Attempting to reconnect... (attempt ${attemptNumber})`);
+    });
+
+    socket.on('reconnect_error', (error) => {
+      console.error('✗ Reconnection error:', error.message);
+      commit('setConnectionError', 'Failed to reconnect. Retrying...');
     });
 
     socket.on('initialUsers', (users) => {
       commit('setUsers', users);
+      commit('setTotalUsers', users.length);
       console.log('✓ Initial user data received');
     });
 
     socket.on('newUsers', ({ users, timestamp }) => {
       commit('updateUsers', { users, timestamp });
+      commit('setTotalUsers', state.list.length);
       console.log('✓ Real-time user update received');
-    });
-
-    socket.on('connect_error', (error) => {
-      console.error('✗ Socket connection error:', error.message);
-      commit('setError', 'Connection to server failed');
     });
 
     commit('setSocket', socket);
@@ -160,6 +207,7 @@ const actions = {
     commit('setUsers', []);
     commit('setCurrentUser', null);
     commit('setError', null);
+    commit('setConnectionError', null);
   }
 };
 
@@ -171,7 +219,10 @@ const getters = {
     return state.lastUpdate;
   },
   isConnected: (state) => {
-    return state.socket && state.socket.connected;
+    return state.isConnected;
+  },
+  connectionError: (state) => {
+    return state.connectionError;
   },
   filteredUsers: (state) => {
     let users = state.list;
